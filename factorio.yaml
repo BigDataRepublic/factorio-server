@@ -1,0 +1,122 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: factorio
+
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: factorio-pv
+  namespace: factorio
+  labels:
+    app: factorio
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/data/factorio"
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: factorio-pv-claim
+  namespace: factorio
+  labels:
+    app: factorio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: factorio
+  namespace: factorio
+  labels:
+    app: factorio
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: factorio
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: factorio
+    spec:
+      volumes:
+        - name: factorio-persistent-storage
+          persistentVolumeClaim:
+            claimName: factorio-pv-claim
+      containers:
+        - name: factorio
+          image: dtandersen/factorio:0.16.51
+          imagePullPolicy: Always
+          ports:
+            - name: game-port
+              containerPort: 34197
+            - name: mgmt-port
+              containerPort: 27015
+          resources:
+            requests:
+              cpu: 1
+              memory: 1024Mi
+            limits:
+              cpu: 1
+              memory: 2048Mi
+          volumeMounts:
+            - mountPath: /factorio
+              name: factorio-persistent-storage
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: factorio-service
+  namespace: factorio
+  labels:
+    app: factorio
+spec:
+  ports:
+    - port: 34197
+      protocol: UDP
+      targetPort: 34197
+  selector:
+    app: factorio
+  externalIPs:
+    - 192.168.3.9
+    - 10.8.0.1
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: factorio-mgmt-service
+  namespace: factorio
+  labels:
+    app: factorio
+spec:
+  ports:
+    - port: 27015
+      protocol: TCP
+      targetPort: 27015
+  selector:
+    app: factorio
+  externalIPs:
+    - 10.8.0.1
